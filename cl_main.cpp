@@ -14,7 +14,7 @@ int main(int argc, char** argv)
 {
 	int csock, qflag;
 	string server_message;
-	string sv_ip = "96.126.108.8";
+	string sv_ip = "prim.staz.io";
 	string message = "The client is contacting the server...Congrats";
 	
 	csock = create_connection_tcp(PORT, sv_ip);
