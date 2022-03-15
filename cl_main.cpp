@@ -15,22 +15,21 @@ int main(int argc, char** argv)
 	int csock, qflag;
 	string server_message;
 	string sv_ip = "prim.staz.io";
-	string message = "The client is contacting the server...Congrats";
 	
-	csock = create_connection_tcp(PORT, sv_ip);
-	send_message(csock, message);
-	server_message = receive_message(csock, qflag);
-
-	cout << server_message << endl;
-
-	while(true)
+	if(argc != 2)
 	{
-		getline(cin, message);
-		if(message.compare("quit") == 0)
-			break;
-
-		send_message(csock, message);
+		cout << "Argument count incorrect" << endl;
+		exit(EXIT_FAILURE);
 	}
+
+
+	csock = create_connection_tcp(PORT, sv_ip);
+	server_message = receive_message(csock);
+	cout << server_message << endl;
+	
+	string server_cmd(argv[1]);
+	send_message(csock, server_cmd);
+	receive_message(csock);
 
 	close_connection(csock);
 	return 0;

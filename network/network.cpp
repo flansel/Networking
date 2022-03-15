@@ -35,7 +35,7 @@ int send_message(int sock, string message)
  * Takes in an active socket and blocks until it receives a message, the message in then
  * returned as a string.
  */
-string receive_message(int sock, int& qflag)
+string receive_message(int sock)
 {
     string ret;
     int bytes;
@@ -44,13 +44,6 @@ string receive_message(int sock, int& qflag)
     do  
     {
         bytes = recv(sock, &buffer[0], buffer.size(), 0); 
-        if(bytes == 0)
-		{
-			cout << "Client closed connection" << endl;
-			qflag = 1;
-			close(sock);
-			return "";
-		}
 		
 		for(char c : buffer)
 		{
@@ -60,7 +53,6 @@ string receive_message(int sock, int& qflag)
 		}
     }   
     while(bytes == BUF_MAXL);
-
     return ret;
 }
 
@@ -105,12 +97,11 @@ int create_connection_tcp(int port, string addr)
  * For server use, starts a server listening on port port, then returns the active socket to
  * be used.
  */
-int server_open_connection_tcp(int port, struct sockaddr_in* client_inf=NULL)
+int server_open_connection_tcp(int port, struct sockaddr_in* server_address)
 {
-    int sock, new_socket, opt=1;
+    int sock, opt=1;
     struct sockaddr_in address;
-	struct sockaddr_in* cl = &address;
-    int addr_len = sizeof(address);
+
 
     if((sock = socket(AF_INET, SOCK_STREAM, 0)) < 0)
     {
@@ -134,13 +125,22 @@ int server_open_connection_tcp(int port, struct sockaddr_in* client_inf=NULL)
         exit(EXIT_FAILURE);
     }
 
-    if(listen(sock, 3) < 0)
+    if(listen(sock, 10) < 0)
     {
         cout << "Error while listening" << endl;
         exit(EXIT_FAILURE);
     }
 
-    if((new_socket = accept(sock, (struct sockaddr*)&address, (socklen_t*)&addr_len)) < 0)
+	memcpy(server_address, &address, sizeof(struct sockaddr_in));
+	
+	return sock;
+}
+
+int server_accept_connection_tcp(int sock, struct sockaddr_in* address, struct sockaddr_in* client_inf)
+{
+    int addr_len = sizeof(*address);   
+	int new_socket;
+	if((new_socket = accept(sock, (struct sockaddr*)&address, (socklen_t*)&addr_len)) < 0)
     {
         cout << "Error while accepting" << endl;
         exit(EXIT_FAILURE);
@@ -148,7 +148,7 @@ int server_open_connection_tcp(int port, struct sockaddr_in* client_inf=NULL)
 
 	if(client_inf != NULL)
 	{
-		memcpy(client_inf, &address, sizeof(client_inf));
+		memcpy(client_inf, &address, sizeof(struct sockaddr_in));
 	}
 
     return new_socket;

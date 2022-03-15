@@ -6,6 +6,7 @@
 #include <vector>
 #include <fstream>
 #include <algorithm>
+#include <thread>
 
 #include <arpa/inet.h>
 
@@ -16,60 +17,75 @@
 
 using namespace std;
 
+int process(int, struct sockaddr_in);
 
 int main(int argc, char** argv)
 {
-	int csock, qflag;
-	struct sockaddr_in client_info;
-	string message = "You've conected with the server...Congrats";
-	string client_message;
-	string cmp;
-	char client_ip_str[INET_ADDRSTRLEN];
-	ofstream server_list;
-	server_list.open("ledger.txt");
-	
-	csock = server_open_connection_tcp(PORT, &client_info);
-	client_message = receive_message(csock, qflag);
+	int main_sock, new_sock;
+	struct sockaddr_in client_info, server_info;
+	main_sock = server_open_connection_tcp(PORT, &server_info);
 
-	cout << client_message << endl;
-
-	send_message(csock, message);
-	
 	while(true)
 	{
-		client_message = receive_message(csock, qflag);
-		if(qflag == 1)
-			break;
-		
-		cmp = client_message.substr(0, client_message.find_first_of(" "));
-		transform(cmp.begin(), cmp.end(), cmp.begin(), [](unsigned char c) -> unsigned char{return tolower(c);});
-		
-		cout << cmp << endl;
-		cout << client_message.length() << endl;
-		if(cmp.compare("start") == 0)
-		{
-			//Add a server to the ledger (ip, key)
-			//Tell the client they are ok to start a udp server.
-			//close the connection
-			inet_ntop(AF_INET, &client_info, client_ip_str, INET_ADDRSTRLEN);
-			server_list << client_message.substr(client_message.find_last_of(" ")+1, client_message.length()) << " " << client_ip_str << "\n";
-
-		}
-		else if(cmp.compare("join") == 0)
-		{
-			//Check for the server in the ledger
-			//if it exists then give the client the ip and the ok to connect and close the socket
-			//else tell if it doesnt exist
-			cout << "in progress" << endl;
-		}
-		else
-		{
-			cout << client_message << endl;
-		}
-		
+		new_sock = server_accept_connection_tcp(main_sock, &server_info, &client_info);
+		process(new_sock, client_info);
+		close_connection(new_sock);
 	}
-	
-	close_connection(csock);
+}
 
+int process(int csock, struct sockaddr_in client_info)
+{
+	string message = "Connection established processing request...";
+	string client_message, cmp, keycode, ip_handoff_str, tmp;
+	char client_ip_str[INET_ADDRSTRLEN];
+	ofstream server_list;
+	ifstream server_list_read;
+	
+	send_message(csock, message);
+	
+	client_message = receive_message(csock);
+	cout << client_message << endl;
+
+	keycode = client_message.substr(client_message.find_last_of(" ")+1, client_message.length());
+	cmp = client_message.substr(0, client_message.find_first_of(" "));		
+	transform(cmp.begin(), cmp.end(), cmp.begin(), [](unsigned char c) -> unsigned char{return tolower(c);});	
+	cout << cmp << endl;
+	
+	if(cmp.compare("start") == 0)
+	{
+		send_message(csock, "1");
+		client_message = receive_message(csock);
+		
+		if(client_message.compare("2") != 0)
+		{
+			return -1;
+		}
+
+		server_list.open("ledger.txt");
+		inet_ntop(AF_INET, &client_info, client_ip_str, INET_ADDRSTRLEN);
+		server_list << keycode << " " << client_ip_str << "\n";
+		server_list.close();
+		send_message(csock, "3");
+	}
+	else if(cmp.compare("join") == 0)
+	{
+		server_list_read.open("ledger.txt");
+		while(getline(server_list_read, cmp))
+		{
+			tmp = cmp.substr(0, cmp.find_first_of(" ")+1);
+			if(keycode.compare(tmp) == 0)
+			{
+				ip_handoff_str = "4" + cmp.substr(cmp.find_last_of(" ")+1 ,cmp.length());
+				send_message(csock, ip_handoff_str);
+				break;
+			}
+			return 0;
+		}
+		server_list_read.close();
+	}
+	else
+	{
+		send_message(csock, "Command not recognized..Goodbye");
+	}
 	return 0;
 }
