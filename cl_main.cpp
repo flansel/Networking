@@ -29,8 +29,18 @@ int main(int argc, char** argv)
 	
 	string server_cmd(argv[1]);
 	send_message(csock, server_cmd);
-	receive_message(csock);
+	server_message = receive_message(csock);
 
-	close_connection(csock);
+	switch(atoi(server_message[0]))
+	{
+		case 1:
+			//I am the server
+			break;
+		case 4:
+			//I am the client
+			break;
+		default:
+			exit(EXIT_FAILURE);
+	}
 	return 0;
 }
